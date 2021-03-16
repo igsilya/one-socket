@@ -110,15 +110,10 @@ How to run
 To start ``one-socket`` broker::
 
   $ export ONE_SOCKET_PATH=./one.socket
-  $ export ONE_SOCKET_CTL_PATH=./one-socket.ctl
   $ ./one-socket
 
 * ``ONE_SOCKET_PATH`` environment variable contains a path for a socket
   that will be used for clients.  Default value is ``/var/run/one.socket``.
-
-* ``ONE_SOCKET_CTL_PATH`` environment variable contains a path for a control
-  socket that will allow to manage the broker itself.  (TODO:  not used yet)
-  Default value is ``/var/run/one-socket.ctl``.
 
 libspbroker
 -----------
@@ -161,8 +156,6 @@ todo
 * Graceful shutdown, correct handling of signals.
 
 * Replace environment variables with cmdline arguments.
-
-* Implement control commands and control tool.
 
 * Basic systemd service file.
 

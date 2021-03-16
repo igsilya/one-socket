@@ -30,37 +30,16 @@
 #include "worker.h"
 
 #define DEFAULT_SOCK_NAME       "one.socket"
-#define DEFAULT_CTL_SOCK_NAME   "one-socket.ctl"
 #define DEFAULT_RUNDIR          "/var/run"
 
 int
 main(void)
 {
-    const char *ctl_sock_path = getenv("ONE_SOCKET_CTL_PATH");
     const char *sock_path = getenv("ONE_SOCKET_PATH");
-    int control_fd;
-    int ctl_client_fd;
+    worker_handle_t worker;
+    int ret;
 
-    if (ctl_sock_path && strlen(ctl_sock_path) >= PATH_MAX) {
-        fprintf(stderr, "Control socket path is too long (%s). "
-                        "Falling back to default.\n",
-                        ctl_sock_path);
-        ctl_sock_path = NULL;
-    }
-    if (!ctl_sock_path) {
-        ctl_sock_path = DEFAULT_RUNDIR"/"DEFAULT_CTL_SOCK_NAME;
-    }
-
-    control_fd = socket_create_listening(ctl_sock_path, true, false);
-    if (control_fd < 0) {
-        fprintf(stderr, "Failed to create control socket (%s): %s\n",
-                ctl_sock_path, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
-    printf("One Socket v" VERSION_STR " started with control socket '%s'\n",
-           ctl_sock_path);
-
+    printf("One Socket v" VERSION_STR ".\n");
 
     if (sock_path && strlen(sock_path) >= PATH_MAX) {
         fprintf(stderr, "One socket path is too long (%s). "
@@ -72,23 +51,18 @@ main(void)
         sock_path = DEFAULT_RUNDIR"/"DEFAULT_SOCK_NAME;
     }
 
-    if (start_worker_thread(sock_path)) {
+    worker = worker_thread_start(sock_path);
+    if (!worker) {
         fprintf(stderr, "Failed to start worker thread.\n");
         exit(EXIT_FAILURE);
     }
 
     /* TODO: daemonize. */
 
-    for (;;) {
-        ctl_client_fd = socket_accept(control_fd);
-        if (ctl_client_fd < 0) {
-            perror("accept() failed on control socket");
-            continue;
-        }
-
-        /* TODO: Receive the message and reply on control commands. */
-
-        close(ctl_client_fd);
+    ret = worker_thread_join(worker);
+    if (ret) {
+        fprintf(stderr, "Failed to join worker thread: %s.\n", strerror(ret));
+        exit(EXIT_FAILURE);
     }
 
     return 0;

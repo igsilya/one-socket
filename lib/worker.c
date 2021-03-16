@@ -288,7 +288,15 @@ exit_listen:
 }
 
 int
-start_worker_thread(const char *sock_path)
+worker_thread_join(worker_handle_t aux)
+{
+    struct worker_thread_info *info = aux;
+
+    return pthread_join(info->thread, NULL);
+}
+
+worker_handle_t
+worker_thread_start(const char *sock_path)
 {
     struct worker_thread_info *aux = calloc(1, sizeof *aux);
     static int counter = 1;
@@ -323,12 +331,12 @@ start_worker_thread(const char *sock_path)
 
     *((pthread_t *) &aux->thread) = thread;
     pthread_mutex_unlock(&aux->mutex);
-    return 0;
+    return (worker_handle_t) aux;
 
 err_unlock:
     pthread_mutex_unlock(&aux->mutex);
     pthread_mutex_destroy(&aux->mutex);
 err:
     free(aux);
-    return -1;
+    return NULL;
 }

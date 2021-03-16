@@ -17,6 +17,9 @@
 #ifndef __ONE_SOCKET_WORKER_H
 #define __ONE_SOCKET_WORKER_H
 
-int start_worker_thread(const char *sock_path);
+typedef void * worker_handle_t;
+
+worker_handle_t worker_thread_start(const char *sock_path);
+int worker_thread_join(worker_handle_t);
 
 #endif
