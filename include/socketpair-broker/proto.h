@@ -30,7 +30,15 @@ enum sp_broker_request {
 
 #define SP_BROKER_MAX_KEY_LENGTH 1024
 
+enum sp_broker_get_pair_mode {
+    SP_BROKER_PAIR_MODE_NONE = 0,
+    SP_BROKER_PAIR_MODE_CLIENT = 1,
+    SP_BROKER_PAIR_MODE_SERVER = 2,
+    SP_BROKER_PAIR_MODE_MAX = 3
+};
+
 struct sp_broker_get_pair_request {
+    uint16_t mode;     /* enum sp_broker_get_pair_mode */
     uint16_t key_len;
     uint8_t key[SP_BROKER_MAX_KEY_LENGTH];
 } __attribute__((__packed__));

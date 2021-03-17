@@ -37,9 +37,10 @@
 #define CLIENT_NAME_MAX 1024
 
 struct client_info {
-    int fd;           /* File descriptor. */
-    int state;        /* Current state in terms of 'enum client_state'. */
-    int key_len;      /* 'key' length. */
+    int fd;                                 /* File descriptor. */
+    enum client_state state;                /* Current state. */
+    enum sp_broker_get_pair_mode mode;      /* NONE, CLIENT or SERVER. */
+    int key_len;                            /* 'key' length. */
     uint8_t key[SP_BROKER_MAX_KEY_LENGTH];  /* Key to find a pair. */
     char name[CLIENT_NAME_MAX];             /* Client name for logs. */
 };
@@ -92,6 +93,7 @@ client_accept(int id, int listen_fd, struct client_info **info)
     }
     (*info)->fd = client_fd;
     (*info)->state = CLIENT_STATE_NEW;
+    (*info)->mode = SP_BROKER_PAIR_MODE_MAX;
     snprintf((*info)->name, CLIENT_NAME_MAX, "client-%02d-%04d-%04d",
              id, seq_no++, client_fd);
     return 0;
@@ -131,17 +133,38 @@ client_recv_msg(int id, struct client_info *info, struct sp_broker_msg *msg)
     return 0;
 }
 
+static bool
+client_match(const struct client_info *client,
+             const struct sp_broker_get_pair_request *get_pair)
+{
+    if (client->mode >= SP_BROKER_PAIR_MODE_MAX) {
+        return false;
+    }
+
+    /* Both modes should be NONE or they should be opposite. */
+    if (client->mode == SP_BROKER_PAIR_MODE_NONE
+        || get_pair->mode == SP_BROKER_PAIR_MODE_NONE) {
+        if (client->mode != get_pair->mode) {
+            return false;
+        }
+    } else if (client->mode == get_pair->mode) {
+        return false;
+    }
+
+    return client->key_len == get_pair->key_len &&
+           !memcmp(client->key, get_pair->key, get_pair->key_len);
+}
+
 static struct client_info *
-client_lookup_by_key(struct client_info **clients, int n_clients,
-                     struct sp_broker_get_pair_request *get_pair)
+client_lookup(struct client_info **clients, int n_clients,
+              const struct sp_broker_get_pair_request *get_pair)
 {
     int i;
 
     /* Might be slow.  TODO: Optimize with hashes or hash maps. */
     for (i = 0; i < n_clients; i++) {
-        if (clients[i]->state == CLIENT_STATE_PAIR_REQUESTED &&
-            clients[i]->key_len == get_pair->key_len &&
-            !memcmp(clients[i]->key, get_pair->key, get_pair->key_len)) {
+        if (clients[i]->state == CLIENT_STATE_PAIR_REQUESTED
+            && client_match(clients[i], get_pair)) {
             return clients[i];
         }
     }
@@ -204,6 +227,17 @@ client_create_and_send_socketpair(int id, struct client_info *a,
     return ret;
 }
 
+static const char *
+pair_mode_str(enum sp_broker_get_pair_mode mode)
+{
+    switch (mode) {
+        case SP_BROKER_PAIR_MODE_NONE:   return "none";
+        case SP_BROKER_PAIR_MODE_CLIENT: return "client";
+        case SP_BROKER_PAIR_MODE_SERVER: return "server";
+        default: return "<unknown>";
+    }
+}
+
 static int
 client_handle_get_pair(int id, struct client_info *info,
                        struct sp_broker_msg *msg,
@@ -219,12 +253,16 @@ client_handle_get_pair(int id, struct client_info *info,
 
     /* Looking for pair before updating info for the current client to avoid
      * finding it.  */
-    pair = client_lookup_by_key(clients, n_clients, &msg->payload.get_pair);
+    pair = client_lookup(clients, n_clients, &msg->payload.get_pair);
 
     /* Updating info for the current client.  */
+    info->mode = msg->payload.get_pair.mode;
     info->key_len = msg->payload.get_pair.key_len;
     memcpy(info->key, msg->payload.get_pair.key, info->key_len);
     info->state = CLIENT_STATE_PAIR_REQUESTED;
+
+    printf("[%02d] %s: key received, mode: %s.\n",
+           id, client_name(info), pair_mode_str(info->mode));
 
     if (pair) {
         /* Pair found! */

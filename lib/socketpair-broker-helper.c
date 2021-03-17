@@ -81,11 +81,17 @@ struct sp_broker_messages {
 static int
 sp_broker_get_pair_validate(const struct sp_broker_msg *msg, char **err)
 {
-    if (!msg->payload.get_pair.key_len
-        || msg->payload.get_pair.key_len > SP_BROKER_MAX_KEY_LENGTH) {
+    const struct sp_broker_get_pair_request *request = &msg->payload.get_pair;
+
+    if (request->mode >= SP_BROKER_PAIR_MODE_MAX) {
+        set_error(err, "Unexpected pair mode (%d)", request->mode);
+        return -1;
+    }
+
+    if (!request->key_len || request->key_len > SP_BROKER_MAX_KEY_LENGTH) {
         set_error(err, "SP_BROKER_GET_PAIR: Invalid key length %"PRIu16
                        ". Valid range: [0-%d].",
-                  msg->payload.get_pair.key_len, SP_BROKER_MAX_KEY_LENGTH);
+                  request->key_len, SP_BROKER_MAX_KEY_LENGTH);
         return -1;
     }
     return 0;
@@ -174,8 +180,9 @@ sp_broker_connect(const char *sock_path, bool nonblock, char **err)
     return broker_fd;
 }
 
-int
-sp_broker_send_get_pair(int broker_fd, const char *key, char **err)
+static int
+sp_broker_send_get_pair__(int broker_fd, const char *key,
+                          enum sp_broker_get_pair_mode mode, char **err)
 {
     struct sp_broker_msg msg;
     int key_len;
@@ -186,6 +193,7 @@ sp_broker_send_get_pair(int broker_fd, const char *key, char **err)
     msg.request = SP_BROKER_GET_PAIR;
     msg.flags |= SP_BROKER_PROTOCOL_VERSION;
     msg.size = sizeof msg.payload.get_pair;
+    msg.payload.get_pair.mode = mode;
     msg.payload.get_pair.key_len = key_len;
     memcpy(msg.payload.get_pair.key, key, key_len);
 
@@ -196,6 +204,24 @@ sp_broker_send_get_pair(int broker_fd, const char *key, char **err)
         return -1;
     }
     return 0;
+}
+
+int
+sp_broker_send_get_pair(int broker_fd, const char *key,
+                        bool server, char **err)
+{
+    return sp_broker_send_get_pair__(broker_fd, key,
+                                     server ? SP_BROKER_PAIR_MODE_SERVER
+                                            : SP_BROKER_PAIR_MODE_CLIENT,
+                                     err);
+}
+
+int
+sp_broker_send_get_pair_nondirectional(int broker_fd, const char *key,
+                                       char **err)
+{
+    return sp_broker_send_get_pair__(broker_fd, key,
+                                     SP_BROKER_PAIR_MODE_NONE, err);
 }
 
 int
@@ -231,18 +257,23 @@ sp_broker_receive_set_pair(int broker_fd, char **err)
 }
 
 
-int
-sp_broker_get_pair(const char *sock_path, const char *key, char **err)
+static int
+sp_broker_get_pair__(const char *sock_path, const char *key,
+                     bool directional, bool server, char **err)
 {
     int peer_fd = -1;
     int broker_fd;
+    int ret;
 
     broker_fd = sp_broker_connect(sock_path, false, err);
     if (broker_fd < 0) {
         return -1;
     }
 
-    if (sp_broker_send_get_pair(broker_fd, key, err) < 0) {
+    ret = directional
+          ? sp_broker_send_get_pair(broker_fd, key, server, err)
+          : sp_broker_send_get_pair_nondirectional(broker_fd, key, err);
+    if (ret < 0) {
         goto exit_close;
     }
 
@@ -254,4 +285,18 @@ sp_broker_get_pair(const char *sock_path, const char *key, char **err)
 exit_close:
     close(broker_fd);
     return peer_fd;
+}
+
+int
+sp_broker_get_pair(const char *sock_path, const char *key,
+                   bool server, char **err)
+{
+    return sp_broker_get_pair__(sock_path, key, true, server, err);
+}
+
+int
+sp_broker_get_pair_nondirectional(const char *sock_path, const char *key,
+                                  char **err)
+{
+    return sp_broker_get_pair__(sock_path, key, false, false, err);
 }

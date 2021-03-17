@@ -37,6 +37,7 @@ main(int argc, char **argv)
 {
     char *sock_path;
     char *key, *mode;
+    bool server;
     int peer_fd;
     char *err;
 
@@ -49,7 +50,9 @@ main(int argc, char **argv)
     key = argv[2];
     mode = argv[3];
 
-    peer_fd = sp_broker_get_pair(sock_path, key, &err);
+    server = !strcmp(mode, "server");
+
+    peer_fd = sp_broker_get_pair(sock_path, key, server, &err);
     if (peer_fd < 0) {
         printf("Failed to get peer from broker on '%s': %s.\n",
                sock_path, err);
@@ -59,7 +62,7 @@ main(int argc, char **argv)
 
     char buf;
     int ret;
-    if (!strcmp(mode, "server")) {
+    if (!server) {
         for (;;) {
             ret = socket_read_message(peer_fd, &buf, 1, NULL, 0, 0);
             if (ret <= 0) {

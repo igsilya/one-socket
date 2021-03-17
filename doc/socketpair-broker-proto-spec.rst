@@ -56,10 +56,13 @@ A SocketPair Broker message consists of 4 fields:
 
   * ``sp_broker_get_pair_request`` structure that consists of:
 
-    * ``key_len`` (``16`` bit field, bits: ``[160-175]``) - number of bytes
+    * ``mode`` (``16`` bit field, bits: ``[160-175]``) - mode in which client
+      will operate.
+
+    * ``key_len`` (``16`` bit field, bits: ``[176-191]``) - number of bytes
       from the following ``key`` field that should be used.
 
-    * ``key`` (``1024`` byte array, bits: ``[176-8367]``) - array of bytes
+    * ``key`` (``1024`` byte array, bits: ``[192-8383]``) - array of bytes
       specific for a client.
 
 In C code this structure could be represented as::
@@ -67,6 +70,7 @@ In C code this structure could be represented as::
   #define SP_BROKER_MAX_KEY_LENGTH 1024
 
   struct sp_broker_get_pair_request {
+      uint16_t mode;
       uint16_t key_len;
       uint8_t key[SP_BROKER_MAX_KEY_LENGTH];
   } __attribute__((__packed__));
@@ -91,6 +95,18 @@ Client requests
 * ``SP_BROKER_GET_PAIR`` (equals to ``0x1`` specified in ``request`` field).
 
   - Payload type: ``sp_broker_get_pair_request``.
+
+    - ``mode`` should be one of:
+
+      - ``SP_BROKER_PAIR_MODE_NONE`` (equal to ``0x0``)
+
+      - ``SP_BROKER_PAIR_MODE_CLIENT`` (equal to ``0x1``)
+
+      - ``SP_BROKER_PAIR_MODE_SERVER`` (equal to ``0x2``)
+
+      Broker will pair clients with ``SP_BROKER_PAIR_MODE_NONE`` together.
+      And it will pair clients that specified ``SP_BROKER_PAIR_MODE_CLIENT``
+      with clients that specified ``SP_BROKER_PAIR_MODE_SERVER``.
 
     - ``key_len`` should be in range ``[1-1024]``.
 

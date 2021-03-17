@@ -39,10 +39,11 @@ Approximate workflow for the broker daemon:
 
 #. Accept one client connection.
 
-#. Receive the ``key`` from the client.
+#. Receive the ``key`` and operation ``mode`` from the client.
 
 #. If daemon already has established connection with some other client that
-   provided the same ``key``:
+   provided the same ``key`` and they have opposite operation ``mode``'s or
+   both didn't specify the ``mode``:
 
    a. Create a new pair of connected sockets.
       (e.g. by ``socketpair()`` syscall)
@@ -60,7 +61,7 @@ Typical workflow of the client application:
 
 #. Connect to the broker-socket.
 
-#. Send pairing request to broker including the ``key``.
+#. Send pairing request to broker including the ``key`` and operation ``mode``.
 
 #. Wait for reply from the broker daemon containing a new socket.
 

@@ -35,14 +35,25 @@ int sp_broker_message_validate(const struct sp_broker_msg *msg,
                                int n_expected, char **err);
 
 /* Connects to the SocketPair Broker on socket 'sock_path' and requests
- * a pair for a key 'key'.  Waits for all operations to finish.
+ * a pair for a key 'key'. If 'server' is 'true', defines that user will
+ * operate as a server, otherwise as a client.  User will be paired with the
+ * other user that specified the opposite operation mode.
+ *
+ * Waits for all operations to finish.
  *
  * On success returns a file descriptor of a socket that could be used
  * to communicate with paired process that provided same 'key'.
  * On error returns -1 and, if 'err' provided, stores the error message there.
  * User takes the ownership of the error message and should release it by
  * calling free().*/
-int sp_broker_get_pair(const char *sock_path, const char *key, char **err);
+int sp_broker_get_pair(const char *sock_path, const char *key,
+                       bool server, char **err);
+
+/* Same sa 'sp_broker_get_pair', but doesn't specify in which mode user
+ * will oparate.  User will be paired only with other user that didn't
+ * specify the operation mode. */
+int sp_broker_get_pair_nondirectional(const char *sock_path, const char *key,
+                                      char **err);
 
 /* Connects to the SocketPair Broker on socket 'sock_path'.  If 'nonblock'
  * set to 'true', connects in nonblocking mode, otherwise waits for connection
@@ -56,13 +67,23 @@ int sp_broker_get_pair(const char *sock_path, const char *key, char **err);
 int sp_broker_connect(const char *sock_path, bool nonblock, char **err);
 
 /* Sends SP_BROKER_GET_PAIR request with key 'key' to the  SocketPair Broker on
- * socket 'broker_fd'.
+ * socket 'broker_fd'.  If 'server' is 'true', defines that user will operate
+ * as a server, otherwise as a client.  User will be paired with the other user
+ * that specified the opposite operation mode.
  *
  * On success returns 0.
  * On failure returns -1 and sets errno.  If 'err' provided, stores the error
  * message there.  User takes the ownership of the error message and should
  * release it by calling free(). */
-int sp_broker_send_get_pair(int broker_fd, const char *key, char **err);
+int sp_broker_send_get_pair(int broker_fd, const char *key,
+                            bool server, char **err);
+
+/* Same sa 'sp_broker_send_get_pair', but doesn't specify in which mode user
+ * will oparate.  User will be paired only with other user that didn't
+ * specify the operation mode. */
+int sp_broker_send_get_pair_nondirectional(int broker_fd, const char *key,
+                                           char **err);
+
 
 /* Attempts to receive SP_BROKER_SET_PAIR request from the  SocketPair Broker
  * on socket 'broker_fd'.

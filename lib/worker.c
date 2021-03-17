@@ -29,6 +29,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <socketpair-broker/proto.h>
+#include <socketpair-broker/helper.h>
+
 #include "broker.h"
 #include "polling.h"
 #include "socket-util.h"
